@@ -5,35 +5,59 @@ import jwt from "jsonwebtoken"
 
 export const register = async (req, res, next) => {
     try {
-        const salt = bcrypt.genSaltSync(10);
-        const passwordHash = await bcrypt.hash("req.body.password", salt);
+        //get user
+        const { fullnames, username, email, password } = req.body
+
+        //validate inputs
+        if (!(fullnames && username && email && password)) {
+            res.status(400).send("All inputs are required")
+        }
+        
+        //checking if the user exist 
+
+        const oldUser = await User.findOne({ email })
+        
+        if (oldUser) {
+            return res.status(409).send("User already exist. Please login")
+        }
+        //encrypt Password
+       const  encryptP = await bcrypt.hash(password, 10)
         const newUser = new User({
-            fullnames: req.body.fullnames, 
-            username: req.body.username, 
+            fullnames: req.body.fullnames,
+            username: req.body.username,
             email: req.body.email,
-            password: passwordHash
+            password: encryptP
         })
-        await newUser.save()
-        res.status(200).send("New User created")
+        const token = jwt.sign({ newUser_id: newUser._id, email }, process.env.JWT)
+        newUser.token = token
+
+        res.status(201).json(newUser)
     } catch (err) {
         next(err)
     }
 }
+
 export const login = async (req, res, next) => {
     try {
-        const user = await User.findOne({ username: req.body.username });
-        if (!user) return next("user not found")
-        
-        const isPasswordCorrect = await bcrypt.compare(req.body.password, user.password)
-        const token = jwt.sign({ id: user._id }, process.env.JWT)
-        const{password, ...userDetails} =user._doc
-        res.cookie("acces token", token, {
-            httpOnly: true
-        }).status(200).json({ user})
-        
-        if (!isPasswordCorrect) 
-            return next("Wrong Password or Username")
-    } catch (err) {
+        const { username, password } = req.body
+        //validate user
+        if (!(username && password)) {
+            res.status(400).send("All inputs are required")
+        }
+        //validate if user exist in the database
+        const user = await User.findOne({ username })
+        if (!user) return next("User not Found")
+   
+        const results = await  bcrypt.compare(password, user.password)
+        if (user && results ) {
+            const token = jwt.sign(
+                { user_id: user._id, username }, process.env.JWT );
+            user.token = token
+            res.status(200).json(user)
+        } else {
+            res.status(400).send("Incorrect  password")
+       }    }
+    catch (err) {
         next(err)
     }
 }
