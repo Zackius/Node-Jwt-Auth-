@@ -2,38 +2,35 @@ import User from "../models/User.js"
 import bcrypt from "bcryptjs"
 import jwt from "jsonwebtoken"
 
+const handleErrors = (err) => {
+    console.log(err.message, err.code)
+    let errors = { fullnames: '', username: '', email: '', password: ''}
+    
+    //validation errors
+    if (err.message.includes("User validation failed")) {
+        Object.values(err.errors).forEach(({properties}) => {
+errors[properties.path] = properties.message
+})
+    }
+    return errors;
+}
 
-export const register = async (req, res, next) => {
+
+export const register = async (req, res) => {
+    const { fullnames, username, email, password } = req.body
     try {
-        //get user
-        const { fullnames, username, email, password } = req.body
-
-        //validate inputs
-        if (!(fullnames && username && email && password)) {
-            res.status(400).send("All inputs are required")
-        }
-                //checking if the user exist 
-        const oldUser = await User.findOne({ email })
-                if (oldUser) {
-            return res.status(409).send("User already exist. Please login")
-        }
-        //encrypt Password
-       const  encryptP = await bcrypt.hash(password, 10)
-        const newUser = await  User.create({
-            fullnames: req.body.fullnames,
-            username: req.body.username,
-            email: req.body.email,
-            password: encryptP
-        })
-        res.status(201).json(newUser)
+        const user = await User.create({ fullnames, username, email, password })
+        res.status(201).json(user)
     } catch (err) {
-        next(err)
+        const errors = handleErrors(err)
+        res.status(400).json({errors})
+         
     }
 }
 
-export const login = async (req, res, next) => {
+export const login = async (req, res) => {
+    const { username, password } = req.body
     try {
-        const { username, password } = req.body
 
         //validate user
         if (!(username && password)) {
@@ -59,6 +56,6 @@ export const login = async (req, res, next) => {
         }
     throw error("Incorrect Username");}
     catch (err) {
-        next(err)
+      (err)
     }
 }
